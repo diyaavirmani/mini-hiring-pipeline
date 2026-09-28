@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "description": "Fictional candidates for demonstrating pipeline stages, history, and assignment searches.",
+  "candidates": [
+    {
+      "full_name": "Priya Sharma",
+      "email": "priya.sharma@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 24},
+        {"stage": "Screening", "days_ago": 10}
+      ]
+    },
+    {
+      "full_name": "Karan Malhotra",
+      "email": "karan.malhotra@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 21},
+        {"stage": "Screening", "days_ago": 9}
+      ]
+    },
+    {
+      "full_name": "Rahul Mehta",
+      "email": "rahul.mehta@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 30},
+        {"stage": "Screening", "days_ago": 18},
+        {"stage": "Interview", "when": "most_recent_monday"}
+      ]
+    },
+    {
+      "full_name": "Fatima Sheikh",
+      "email": "fatima.sheikh@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 28},
+        {"stage": "Screening", "days_ago": 16},
+        {"stage": "Interview", "when": "most_recent_monday"}
+      ]
+    },
+    {
+      "full_name": "Anita Desai",
+      "email": "anita.desai@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 48},
+        {"stage": "Screening", "days_ago": 39},
+        {"stage": "Interview", "days_ago": 22},
+        {"stage": "Offer", "days_ago": 5}
+      ]
+    },
+    {
+      "full_name": "Meera Iyer",
+      "email": "meera.iyer@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 52},
+        {"stage": "Screening", "days_ago": 41},
+        {"stage": "Interview", "days_ago": 24},
+        {"stage": "Offer", "days_ago": 6}
+      ]
+    },
+    {
+      "full_name": "Joseph Fernandes",
+      "email": "joseph.fernandes@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 60},
+        {"stage": "Screening", "days_ago": 49},
+        {"stage": "Interview", "days_ago": 30},
+        {"stage": "Offer", "days_ago": 8}
+      ]
+    },
+    {
+      "full_name": "Vikram Nair",
+      "email": "vikram.nair@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 90},
+        {"stage": "Screening", "days_ago": 78},
+        {"stage": "Interview", "days_ago": 63},
+        {"stage": "Offer", "days_ago": 52},
+        {"stage": "Hired", "days_ago": 45}
+      ]
+    },
+    {
+      "full_name": "Farah Qureshi",
+      "email": "farah.qureshi@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 42},
+        {"stage": "Screening", "days_ago": 33},
+        {"stage": "Interview", "days_ago": 20},
+        {"stage": "Offer", "days_ago": 12},
+        {"stage": "Rejected", "days_ago": 3, "reason": "Offer terms did not align."}
+      ]
+    },
+    {
+      "full_name": "Aisha Khan",
+      "email": "aisha.khan@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 20},
+        {"stage": "Screening", "days_ago": 12},
+        {"stage": "Rejected", "days_ago": 11, "reason": "Role requirements not met."}
+      ]
+    },
+    {
+      "full_name": "Dev Patel",
+      "email": "dev.patel@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 7},
+        {"stage": "Rejected", "days_ago": 6, "reason": "Candidate withdrew."}
+      ]
+    },
+    {
+      "full_name": "Nisha Kapoor",
+      "email": "nisha.kapoor@example.test",
+      "phone": null,
+      "history": [
+        {"stage": "Applied", "days_ago": 2}
+      ]
+    }
+  ]
+}

@@ -25,10 +25,13 @@ Then initialize the schema and start the API:
 ```bash
 python -m hiring_pipeline.migrate
 python -m hiring_pipeline.create_recruiter
+python -m hiring_pipeline.seed
 uvicorn hiring_pipeline.main:app --reload
 ```
 
 Create one recruiter account with the CLI prompt, then open <http://127.0.0.1:8000/docs> to use the API. The API sets a one-hour, signed, HTTP-only recruiter cookie after login. It uses `SameSite=Lax`; production mode also marks the cookie Secure. The local database is created at `data/hiring_pipeline.sqlite3`. `.env` and local SQLite files are ignored by Git.
+
+The fictional, readable fixture is [`data/sample_candidates.json`](data/sample_candidates.json). Seeding is safe to repeat: existing candidates with fixture emails and their histories are left unchanged. It creates examples for the typo target Priya Sharma; candidates currently in every stage; Priya and Karan in Screening for more than a week; Rahul and Fatima moved to Interview at the most recent Monday boundary in `APP_TIMEZONE`; four people who reached Offer without being hired, including Farah who was rejected after Offer; Vikram, who was hired; and three rejected candidates. Rejected candidates are excluded from the “everyone except rejected” group, while Hired candidates remain in it.
 
 ## Design choices
 
@@ -61,11 +64,11 @@ Run the focused tests with:
 python -m unittest discover -s tests -v
 ```
 
-The test suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, complete history, missing candidates, two concurrent requests racing from the same stage, login protection, API creation/list/detail/move/rejection, validation errors, and response status codes. Eleven tests pass in this commit.
+The test suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, complete history, missing candidates, two concurrent requests racing from the same stage, login protection, API creation/list/detail/move/rejection, validation errors, response status codes, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding. Sixteen tests pass in this commit.
 
 ## Checks and current status
 
-The service and API integration test suite passes (11 tests). The browser UI and search are not yet implemented and do not yet have behavior tests.
+The service, API integration, and seed-data test suite passes (16 tests). The browser UI and search are not yet implemented and do not yet have behavior tests.
 
 The candidate endpoints are authenticated and are listed in `/docs`: `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/candidates`, `GET /api/candidates`, `GET /api/candidates/{id}`, `POST /api/candidates/{id}/advance`, and `POST /api/candidates/{id}/reject`. List and detail responses include time in the current stage; detail includes complete audit history. Validation errors return `422`, missing candidates return `404`, duplicate emails and illegal or stale moves return `409`, and unauthenticated requests return `401` using a consistent JSON error envelope.
 

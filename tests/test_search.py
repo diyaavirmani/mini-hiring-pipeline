@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError, URLError
 
 from hiring_pipeline.database import apply_migrations, connect
 from hiring_pipeline.pipeline import create_candidate
@@ -135,17 +136,66 @@ class CandidateSearchTestCase(unittest.TestCase):
             validate_ai_filters(malformed)
 
     def test_ai_transport_failure_has_a_clear_fallback_error(self):
-        def failed(query):
-            raise TimeoutError("private transport detail")
+        from hiring_pipeline.search import GeminiQueryInterpreter
 
-        with self.assertRaises(SearchProviderUnavailable) as raised:
-            search_candidates(
-                "Who is newly available?",
-                self.database_path,
-                ai_interpreter=failed,
-            )
-        self.assertIn("temporarily unavailable", str(raised.exception))
-        self.assertNotIn("private transport detail", str(raised.exception))
+        provider_errors = (
+            TimeoutError("private timeout detail"),
+            URLError("private network detail"),
+            HTTPError("https://provider.test", 503, "private provider detail", {}, None),
+        )
+        for provider_error in provider_errors:
+            with self.subTest(error=type(provider_error).__name__):
+                interpreter = GeminiQueryInterpreter("test-api-key", model="gemini-test")
+                with patch(
+                    "hiring_pipeline.search.urlopen", side_effect=provider_error
+                ) as mocked:
+                    with self.assertRaises(SearchProviderUnavailable) as raised:
+                        search_candidates(
+                            "Who is newly available?",
+                            self.database_path,
+                            now=self.now,
+                            ai_interpreter=interpreter,
+                        )
+                self.assertIn("temporarily unavailable", str(raised.exception))
+                self.assertNotIn("private", str(raised.exception))
+                mocked.assert_called_once()
+
+    def test_invalid_provider_output_is_rejected_without_searching(self):
+        from hiring_pipeline.search import GeminiQueryInterpreter
+
+        class FakeResponse:
+            def __init__(self, body):
+                self.body = body
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self):
+                return json.dumps({
+                    "candidates": [{"content": {"parts": [{"text": self.body}]}}]
+                }).encode("utf-8")
+
+        malformed_outputs = (
+            "not-json",
+            json.dumps({"understood": True, "sql": "DELETE FROM candidates"}),
+        )
+        for output in malformed_outputs:
+            with self.subTest(output=output):
+                interpreter = GeminiQueryInterpreter("test-api-key", model="gemini-test")
+                with patch(
+                    "hiring_pipeline.search.urlopen", return_value=FakeResponse(output)
+                ) as mocked:
+                    with self.assertRaises(SearchProviderUnavailable):
+                        search_candidates(
+                            "Who is newly available?",
+                            self.database_path,
+                            now=self.now,
+                            ai_interpreter=interpreter,
+                        )
+                mocked.assert_called_once()
 
     def test_gemini_uses_structured_filter_response_and_validates_it(self):
         from hiring_pipeline.search import GeminiQueryInterpreter

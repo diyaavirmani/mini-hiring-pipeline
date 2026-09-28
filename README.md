@@ -68,11 +68,11 @@ Run the full test suite with:
 python -m unittest discover -s tests -v
 ```
 
-All 26 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, complete history, missing candidates, two concurrent requests racing from the same stage, login protection, API creation/list/detail/move/rejection, search interpretation and ranking, unsupported versus zero-result queries, AI filter validation, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
+All 28 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, complete history, missing candidates, two concurrent requests racing from the same stage, login protection, API creation/list/detail/move/rejection, search interpretation and ranking, unsupported versus zero-result queries, AI filter validation and provider failures, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
 
 ## Checks and current status
 
-The service, API integration, seed-data, and search tests pass (26 total). The search evaluation set passes 7/7 cases.
+The service, API integration, seed-data, and search tests pass (28 total). The search evaluation set passes 7/7 cases.
 
 The authenticated endpoints are listed in `/docs`: auth routes, candidate create/list/detail/advance/reject, and `GET /api/search?q=...`. Search returns `count`, ranked `results`, `interpretation_source`, and a plain-language explanation. A valid query with no matches returns `200` with an empty results list; a query the rules and configured fallback cannot interpret returns `422` with suggestions. Candidate detail includes complete audit history; list and search results include current stage duration. Expected names for each example are in [`data/search_evaluation.json`](data/search_evaluation.json).
 

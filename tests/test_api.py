@@ -4,12 +4,14 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 os.environ.setdefault("APP_SECRET_KEY", "test-only-secret-key-value-not-for-use")
 
 from argon2 import PasswordHasher
 from fastapi.testclient import TestClient
 
+from hiring_pipeline.config import Settings
 from hiring_pipeline.database import apply_migrations, connect
 from hiring_pipeline.main import create_app
 from hiring_pipeline.search import SearchFilters
@@ -205,6 +207,31 @@ class CandidateApiTestCase(unittest.TestCase):
             self.assertEqual(
                 [item["full_name"] for item in response.json()["results"]], ["Nisha Kapoor"]
             )
+
+    def test_missing_ai_credentials_leave_deterministic_search_available(self):
+        settings = Settings(
+            app_secret_key="integration-test-secret-key-32-chars",
+            app_env="test",
+            app_timezone="Asia/Kolkata",
+            database_path=self.database_path,
+            gemini_api_key=None,
+            gemini_model="gemini-test",
+        )
+        with patch("hiring_pipeline.main.get_settings", return_value=settings):
+            app = create_app()
+        self.assertIsNone(app.state.ai_interpreter)
+
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/auth/login",
+                json={"email": "recruiter@example.test", "password": "correct-horse-battery"},
+            )
+            self.assertEqual(login.status_code, 200)
+            with patch("hiring_pipeline.search.urlopen") as provider:
+                response = client.get("/api/search", params={"q": "Who is newly available?"})
+            self.assertEqual(response.status_code, 422)
+            self.assertEqual(response.json()["error"]["code"], "query_not_understood")
+            provider.assert_not_called()
 
 
 if __name__ == "__main__":

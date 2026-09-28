@@ -5,7 +5,8 @@ from typing import Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from .auth import (
     SESSION_COOKIE,
@@ -73,6 +74,12 @@ def create_app(
     application.state.secure_cookie = secure_cookie
     application.state.timezone_name = timezone_name
     application.state.ai_interpreter = ai_interpreter
+    static_directory = Path(__file__).resolve().parent / "static"
+    application.mount("/static", StaticFiles(directory=static_directory), name="static")
+
+    @application.get("/", include_in_schema=False)
+    def recruiter_interface():
+        return FileResponse(static_directory / "index.html")
 
     @application.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError):

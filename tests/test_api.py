@@ -56,6 +56,14 @@ class CandidateApiTestCase(unittest.TestCase):
         body.update(overrides)
         return self.client.post("/api/candidates", json=body)
 
+    def test_recruiter_interface_and_static_assets_are_served(self):
+        page = self.client.get("/")
+        self.assertEqual(page.status_code, 200)
+        self.assertIn('id="app"', page.text)
+        script = self.client.get("/static/app.js")
+        self.assertEqual(script.status_code, 200)
+        self.assertIn("/api/candidates", script.text)
+
     def test_authentication_protects_candidate_actions(self):
         response = self.client.get("/api/candidates")
         self.assertEqual(response.status_code, 401)

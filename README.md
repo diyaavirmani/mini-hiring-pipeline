@@ -1,6 +1,6 @@
 # Mini Hiring Pipeline
 
-A local-first hiring pipeline for one recruiter managing candidates for one job. The project includes a FastAPI API, secure local configuration, SQLite database, and schema migration runner. Candidate stage rules, audit history, and read-only search are available through authenticated HTTP routes. The browser UI is still to come.
+A local-first hiring pipeline for one recruiter managing candidates for one job. The project includes a FastAPI API, recruiter interface, secure local configuration, SQLite database, and schema migration runner. Candidate stage rules, audit history, and read-only search are available through authenticated HTTP routes and the browser interface.
 
 ## Run locally
 
@@ -29,7 +29,7 @@ python -m hiring_pipeline.seed
 uvicorn hiring_pipeline.main:app --reload
 ```
 
-Create one recruiter account with the CLI prompt, then open <http://127.0.0.1:8000/docs> to use the API. The API sets a one-hour, signed, HTTP-only recruiter cookie after login. It uses `SameSite=Lax`; production mode also marks the cookie Secure. The local database is created at `data/hiring_pipeline.sqlite3`. `.env` and local SQLite files are ignored by Git.
+Create one recruiter account with the CLI prompt, then open <http://127.0.0.1:8000> and sign in. The board groups candidates by stage, shows time in stage, and provides candidate creation, advance/reject actions, complete audit history, and a single search box. The API sets a one-hour, signed, HTTP-only recruiter cookie after login. It uses `SameSite=Lax`; production mode also marks the cookie Secure. The API docs remain at <http://127.0.0.1:8000/docs>. The local database is created at `data/hiring_pipeline.sqlite3`. `.env` and local SQLite files are ignored by Git.
 
 `GEMINI_API_KEY` is optional. Without it, the deterministic search grammar handles supported queries and clearly explains unsupported ones. With a key, unsupported queries get one Gemini interpretation attempt, constrained to validated, read-only search filters. Set `GEMINI_MODEL` to override the default.
 
@@ -72,7 +72,7 @@ All 28 tests pass. The suite covers initial stage and valid forward moves, rejec
 
 ## Checks and current status
 
-The service, API integration, seed-data, and search tests pass (28 total). The search evaluation set passes 7/7 cases.
+The service, API integration, seed-data, and search tests pass (29 total). Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh. The search evaluation set passes 7/7 cases.
 
 The authenticated endpoints are listed in `/docs`: auth routes, candidate create/list/detail/advance/reject, and `GET /api/search?q=...`. Search returns `count`, ranked `results`, `interpretation_source`, and a plain-language explanation. A valid query with no matches returns `200` with an empty results list; a query the rules and configured fallback cannot interpret returns `422` with suggestions. Candidate detail includes complete audit history; list and search results include current stage duration. Expected names for each example are in [`data/search_evaluation.json`](data/search_evaluation.json).
 
@@ -86,4 +86,4 @@ The runner uses a fresh temporary database and fictional seed data, so it does n
 
 ## Planned next steps
 
-Next, connect the API to the browser UI and refine the search evaluation set with real query feedback. AWS and Docker are out of scope.
+Next, refine the interface and search evaluation set with recruiter feedback. AWS and Docker are out of scope.

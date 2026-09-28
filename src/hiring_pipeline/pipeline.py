@@ -55,6 +55,10 @@ class PipelineIntegrityError(PipelineError):
     pass
 
 
+class DuplicateCandidate(PipelineError):
+    pass
+
+
 def _current_stage(connection: sqlite3.Connection, candidate_id: int) -> str:
     candidate = connection.execute(
         "SELECT 1 FROM candidates WHERE id = ?", (candidate_id,)
@@ -107,6 +111,8 @@ def create_candidate(
         connection.commit()
     except sqlite3.IntegrityError as exc:
         connection.rollback()
+        if "candidates.email" in str(exc):
+            raise DuplicateCandidate("A candidate with this email already exists.") from exc
         raise PipelineIntegrityError(
             "Candidate could not be created. Check recruiter and candidate details."
         ) from exc
@@ -243,5 +249,92 @@ def get_candidate_stage(
         if exists is None:
             raise CandidateNotFound(f"Candidate {candidate_id} was not found.")
         return _current_stage(connection, candidate_id)
+    finally:
+        connection.close()
+
+
+def _stage_elapsed_seconds(created_at: str) -> float:
+    from datetime import datetime, timezone
+
+    entered_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+    return max(0.0, (datetime.now(timezone.utc) - entered_at).total_seconds())
+
+
+def _candidate_payload(
+    row: sqlite3.Row,
+    include_history: bool,
+    connection: sqlite3.Connection,
+) -> Dict[str, object]:
+    elapsed = _stage_elapsed_seconds(row["stage_entered_at"])
+    payload = {
+        "id": row["id"],
+        "full_name": row["full_name"],
+        "email": row["email"],
+        "phone": row["phone"],
+        "created_at": row["created_at"],
+        "current_stage": row["current_stage"],
+        "stage_entered_at": row["stage_entered_at"],
+        "time_in_current_stage_seconds": elapsed,
+        "time_in_current_stage_days": elapsed / 86400,
+    }
+    if include_history:
+        history = connection.execute(
+            """SELECT id, actor_id, from_stage, to_stage, reason, created_at
+               FROM candidate_stage_events WHERE candidate_id = ? ORDER BY id""",
+            (row["id"],),
+        ).fetchall()
+        payload["history"] = [dict(event) for event in history]
+    return payload
+
+
+def list_candidates_grouped(database_path: Optional[Path] = None) -> Dict[str, List[Dict[str, object]]]:
+    """List candidates grouped by current stage, with time in that stage."""
+    grouped = {stage: [] for stage in (
+        Stage.APPLIED.value,
+        Stage.SCREENING.value,
+        Stage.INTERVIEW.value,
+        Stage.OFFER.value,
+        Stage.HIRED.value,
+        Stage.REJECTED.value,
+    )}
+    connection = connect(database_path)
+    try:
+        rows = connection.execute(
+            """SELECT c.id, c.full_name, c.email, c.phone, c.created_at,
+                      e.to_stage AS current_stage, e.created_at AS stage_entered_at
+               FROM candidates AS c
+               JOIN candidate_stage_events AS e ON e.id = (
+                   SELECT id FROM candidate_stage_events
+                   WHERE candidate_id = c.id ORDER BY id DESC LIMIT 1
+               )
+               ORDER BY c.full_name COLLATE NOCASE, c.id"""
+        ).fetchall()
+        for row in rows:
+            grouped[row["current_stage"]].append(
+                _candidate_payload(row, include_history=False, connection=connection)
+            )
+        return grouped
+    finally:
+        connection.close()
+
+
+def get_candidate(candidate_id: int, database_path: Optional[Path] = None) -> Dict[str, object]:
+    """Return one candidate, latest-stage duration, and complete audit history."""
+    connection = connect(database_path)
+    try:
+        row = connection.execute(
+            """SELECT c.id, c.full_name, c.email, c.phone, c.created_at,
+                      e.to_stage AS current_stage, e.created_at AS stage_entered_at
+               FROM candidates AS c
+               JOIN candidate_stage_events AS e ON e.id = (
+                   SELECT id FROM candidate_stage_events
+                   WHERE candidate_id = c.id ORDER BY id DESC LIMIT 1
+               )
+               WHERE c.id = ?""",
+            (candidate_id,),
+        ).fetchone()
+        if row is None:
+            raise CandidateNotFound(f"Candidate {candidate_id} was not found.")
+        return _candidate_payload(row, include_history=True, connection=connection)
     finally:
         connection.close()

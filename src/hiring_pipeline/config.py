@@ -19,6 +19,7 @@ class ConfigurationError(ValueError):
 @dataclass(frozen=True)
 class Settings:
     app_secret_key: str
+    app_env: str
     app_timezone: str
     database_path: Path
 
@@ -30,6 +31,10 @@ def get_settings() -> Settings:
             "APP_SECRET_KEY must contain at least 32 characters. "
             "Copy .env.example to .env and set a random value."
         )
+
+    app_env = os.getenv("APP_ENV", "development").strip().lower()
+    if app_env not in {"development", "test", "production"}:
+        raise ConfigurationError("APP_ENV must be development, test, or production.")
 
     timezone = os.getenv("APP_TIMEZONE", "Asia/Kolkata").strip()
     try:
@@ -55,6 +60,7 @@ def get_settings() -> Settings:
 
     return Settings(
         app_secret_key=secret,
+        app_env=app_env,
         app_timezone=timezone,
         database_path=database_path.resolve(),
     )

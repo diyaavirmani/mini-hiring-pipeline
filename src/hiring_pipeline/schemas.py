@@ -11,6 +11,9 @@ PIPELINE_STAGES = ("Applied", "Screening", "Interview", "Offer", "Hired", "Rejec
 
 
 class LoginRequest(BaseModel):
+    class Config:
+        extra = "forbid"
+
     email: str = Field(min_length=3, max_length=320)
     password: str = Field(min_length=1, max_length=1024)
 
@@ -23,6 +26,9 @@ class LoginRequest(BaseModel):
 
 
 class CandidateCreateRequest(BaseModel):
+    class Config:
+        extra = "forbid"
+
     full_name: str = Field(min_length=1, max_length=200)
     email: Optional[str] = Field(default=None, max_length=320)
     phone: Optional[str] = Field(default=None, max_length=50)
@@ -50,7 +56,17 @@ class CandidateCreateRequest(BaseModel):
         return value.strip()
 
 
+class SearchRequest(BaseModel):
+    class Config:
+        extra = "forbid"
+
+    q: str = Field(min_length=1, max_length=500)
+
+
 class StageRequest(BaseModel):
+    class Config:
+        extra = "forbid"
+
     expected_stage: str
 
     @validator("expected_stage")

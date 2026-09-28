@@ -58,6 +58,8 @@ The stage-event insert trigger checks that the first event is Applied, later eve
 
 Migration `0002_guard_initial_event.sql` corrects the initial trigger so a candidate's first Applied event is accepted while later forward moves remain constrained. Applied migrations are not edited in place; fixes are made in a new migration.
 
+Migration `0003_single_recruiter.sql` adds a database trigger that prevents a second recruiter from being inserted, including concurrent account-creation attempts.
+
 ## Stage operations and tests
 
 `create_candidate`, `advance_candidate`, `reject_candidate`, `get_candidate_stage`, and `get_candidate_history` are implemented in `src/hiring_pipeline/pipeline.py`. History is returned oldest-first and includes the actor, source and destination stages, reason, and UTC creation time. Rejection is valid from Applied, Screening, Interview, or Offer; no transition is valid after Hired or Rejected. Caller-provided expected stage protects against stale UI state, while the database trigger remains a second line of defense.
@@ -68,13 +70,13 @@ Run the full test suite with:
 python -m unittest discover -s tests -v
 ```
 
-All 28 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, complete history, missing candidates, two concurrent requests racing from the same stage, login protection, API creation/list/detail/move/rejection, search interpretation and ranking, unsupported versus zero-result queries, AI filter validation and provider failures, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
+All 37 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, concurrent advance/reject races, singleton recruiter integrity, complete history, login protection, request validation, safe unexpected-error responses, production cookie settings, configuration validation, search interpretation and ranking, combined filters, unsupported versus valid-zero-result queries, AI filter validation and provider failures, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
 
 ## Checks and current status
 
-The service, API integration, seed-data, and search tests pass (29 total). Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh. The search evaluation set passes 7/7 cases.
+The service, API integration, seed-data, configuration, and search tests pass (37 total). The search evaluation set passes 19/19 queries: seven assignment examples, six combined or valid-zero-result searches, and six invalid-query cases. Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh.
 
-The authenticated endpoints are listed in `/docs`: auth routes, candidate create/list/detail/advance/reject, and `GET /api/search?q=...`. Search returns `count`, ranked `results`, `interpretation_source`, and a plain-language explanation. A valid query with no matches returns `200` with an empty results list; a query the rules and configured fallback cannot interpret returns `422` with suggestions. Candidate detail includes complete audit history; list and search results include current stage duration. Expected names for each example are in [`data/search_evaluation.json`](data/search_evaluation.json).
+The authenticated endpoints are listed in `/docs`: auth routes, candidate create/list/detail/advance/reject, and `POST /api/search` with a JSON `q` field. Search text stays out of URL paths and query strings. Search returns `count`, ranked `results`, `interpretation_source`, and a plain-language explanation. A valid query with no matches returns `200` with an empty results list; a query the rules and configured fallback cannot interpret returns `422` with suggestions. Candidate detail includes complete audit history; list and search results include current stage duration. Expected names and unsupported-query cases are in [`data/search_evaluation.json`](data/search_evaluation.json).
 
 Run the actual search examples and compare them to expected names with:
 
@@ -86,4 +88,4 @@ The runner uses a fresh temporary database and fictional seed data, so it does n
 
 ## Planned next steps
 
-Next, refine the interface and search evaluation set with recruiter feedback. AWS and Docker are out of scope.
+With more time, add login-attempt throttling, protected/encrypted backup handling for candidate data, and automated browser regression tests. The local SQLite file is not encrypted at rest, so host and backup permissions still matter. AWS and Docker are out of scope.

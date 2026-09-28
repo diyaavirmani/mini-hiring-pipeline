@@ -280,7 +280,10 @@
     state.searchError = null;
     renderApp();
     try {
-      state.searchResults = await api(`/api/search?q=${encodeURIComponent(state.query.trim())}`);
+      state.searchResults = await api("/api/search", {
+        method: "POST",
+        body: JSON.stringify({ q: state.query.trim() }),
+      });
     } catch (err) {
       state.searchResults = null;
       state.searchError = { message: err.message, examples: err.data?.error?.examples || [], status: err.status };

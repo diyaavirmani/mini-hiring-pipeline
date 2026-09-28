@@ -31,6 +31,38 @@
         "Anita Desai", "Fatima Sheikh", "Joseph Fernandes", "Karan Malhotra",
         "Meera Iyer", "Nisha Kapoor", "Priya Sharma", "Rahul Mehta", "Vikram Nair"
       ]
+    },
+    {
+      "query": "Priya in Screening for more than a week except rejected",
+      "expected_names": ["Priya Sharma"]
+    },
+    {
+      "query": "Who is in Interview and moved to Interview since Monday?",
+      "expected_names": ["Fatima Sheikh", "Rahul Mehta"]
+    },
+    {
+      "query": "Who reached Offer but didn't get hired except rejected candidates?",
+      "expected_names": ["Anita Desai", "Joseph Fernandes", "Meera Iyer"]
+    },
+    {
+      "query": "Everyone except rejected candidates in Screening",
+      "expected_names": ["Karan Malhotra", "Priya Sharma"]
+    },
+    {
+      "query": "Find Priya Sharma in Screening",
+      "expected_names": ["Priya Sharma"]
+    },
+    {
+      "query": "Who is stuck in Screening for more than 30 days?",
+      "expected_names": []
     }
+  ],
+  "invalid_queries": [
+    "Who is in Interview or Applied?",
+    "Who is in Interview and Hired?",
+    "Who moved to Interview since Tuesday?",
+    "Who is in Interview since Monday?",
+    "Who is not in Interview?",
+    "Tell me a joke"
   ]
 }

@@ -205,6 +205,47 @@ class PipelineTestCase(unittest.TestCase):
         self.assertEqual(get_candidate_stage(candidate_id, self.database_path), "Screening")
         self.assertEqual(len(get_candidate_history(candidate_id, self.database_path)), 2)
 
+    def test_concurrent_advance_and_rejection_allow_only_one_event(self):
+        candidate_id = self.candidate()
+        barrier = threading.Barrier(2)
+
+        def advance():
+            barrier.wait(timeout=3)
+            return advance_candidate(
+                candidate_id, self.actor_id, "Applied", database_path=self.database_path
+            )
+
+        def reject():
+            barrier.wait(timeout=3)
+            return reject_candidate(
+                candidate_id, self.actor_id, "Applied", database_path=self.database_path
+            )
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(advance), executor.submit(reject)]
+            outcomes = []
+            for future in futures:
+                try:
+                    outcomes.append(future.result(timeout=10))
+                except StageConflict as exc:
+                    outcomes.append(exc)
+
+        self.assertEqual(sum(isinstance(outcome, dict) for outcome in outcomes), 1)
+        self.assertEqual(sum(isinstance(outcome, StageConflict) for outcome in outcomes), 1)
+        self.assertIn(get_candidate_stage(candidate_id, self.database_path), {"Screening", "Rejected"})
+        self.assertEqual(len(get_candidate_history(candidate_id, self.database_path)), 2)
+
+    def test_database_allows_only_one_recruiter_account(self):
+        connection = connect(self.database_path)
+        try:
+            with self.assertRaises(sqlite3.IntegrityError):
+                connection.execute(
+                    "INSERT INTO recruiters(email, password_hash) VALUES (?, ?)",
+                    ("second@example.test", "test-hash"),
+                )
+        finally:
+            connection.close()
+
     def test_history_for_unknown_candidate_is_clear(self):
         with self.assertRaises(CandidateNotFound):
             get_candidate_history(999, self.database_path)

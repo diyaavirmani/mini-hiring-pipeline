@@ -64,10 +64,56 @@ class CandidateApiTestCase(unittest.TestCase):
         self.assertEqual(script.status_code, 200)
         self.assertIn("/api/candidates", script.text)
 
+    def test_unexpected_server_errors_return_generic_safe_response(self):
+        self.login()
+        safe_client = TestClient(self.client.app, raise_server_exceptions=False)
+        safe_client.cookies.update(self.client.cookies)
+        with patch("hiring_pipeline.main.logger.error"), patch(
+            "hiring_pipeline.main.list_candidates_grouped",
+            side_effect=RuntimeError("private SQL detail"),
+        ):
+            response = safe_client.get("/api/candidates")
+        safe_client.close()
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(response.json()["error"]["code"], "internal_error")
+        self.assertNotIn("private SQL detail", response.text)
+
+    def test_production_cookie_is_secure_and_explicit_secret_is_validated(self):
+        with self.assertRaises(RuntimeError):
+            create_app(
+                database_path=self.database_path,
+                secret_key="short",
+                secure_cookie=False,
+            )
+
+        settings = Settings(
+            app_secret_key="integration-test-secret-key-32-chars",
+            app_env="production",
+            app_timezone="Asia/Kolkata",
+            database_path=self.database_path,
+            gemini_api_key=None,
+            gemini_model="gemini-test",
+        )
+        with patch("hiring_pipeline.main.get_settings", return_value=settings):
+            app = create_app()
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/auth/login",
+                json={"email": "recruiter@example.test", "password": "correct-horse-battery"},
+            )
+        self.assertEqual(login.status_code, 200)
+        cookie = login.headers["set-cookie"].lower()
+        self.assertIn("secure", cookie)
+        self.assertIn("httponly", cookie)
+        self.assertIn("samesite=lax", cookie)
+
     def test_authentication_protects_candidate_actions(self):
         response = self.client.get("/api/candidates")
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.json()["error"]["code"], "authentication_required")
+        search = self.client.post("/api/search", json={"q": "in Interview"})
+        self.assertEqual(search.status_code, 401)
+        self.assertEqual(search.json()["error"]["code"], "authentication_required")
 
         rejected_login = self.client.post(
             "/api/auth/login",
@@ -76,7 +122,10 @@ class CandidateApiTestCase(unittest.TestCase):
         self.assertEqual(rejected_login.status_code, 401)
         self.assertEqual(rejected_login.json()["error"]["code"], "invalid_credentials")
 
-        self.login()
+        login = self.login()
+        cookie = login.headers["set-cookie"].lower()
+        self.assertIn("samesite=lax", cookie)
+        self.assertIn("max-age=3600", cookie)
         me = self.client.get("/api/auth/me")
         self.assertEqual(me.status_code, 200)
         self.assertEqual(me.json()["recruiter"]["id"], self.recruiter_id)
@@ -137,6 +186,13 @@ class CandidateApiTestCase(unittest.TestCase):
 
     def test_invalid_input_duplicate_email_and_missing_candidate_errors(self):
         self.login()
+        blank_search = self.client.post("/api/search", json={"q": " "})
+        self.assertEqual(blank_search.status_code, 422)
+        self.assertEqual(blank_search.json()["error"]["code"], "query_not_understood")
+        long_search = self.client.post("/api/search", json={"q": "x" * 501})
+        self.assertEqual(long_search.status_code, 422)
+        self.assertEqual(long_search.json()["error"]["code"], "invalid_request")
+
         invalid_name = self.create_candidate(full_name="   ")
         self.assertEqual(invalid_name.status_code, 422)
         self.assertEqual(invalid_name.json()["error"]["code"], "invalid_request")
@@ -144,6 +200,12 @@ class CandidateApiTestCase(unittest.TestCase):
         invalid_email = self.create_candidate(email="not-an-email")
         self.assertEqual(invalid_email.status_code, 422)
         self.assertEqual(invalid_email.json()["error"]["details"][0]["field"], "email")
+
+        extra_input = self.client.post(
+            "/api/candidates",
+            json={"full_name": "Unexpected Field", "is_admin": True},
+        )
+        self.assertEqual(extra_input.status_code, 422)
 
         created = self.create_candidate()
         self.assertEqual(created.status_code, 201)
@@ -175,22 +237,22 @@ class CandidateApiTestCase(unittest.TestCase):
         self.login()
         seed_sample_data(self.database_path, fixture_path=DEFAULT_FIXTURE)
 
-        typo = self.client.get("/api/search", params={"q": "sharam"})
+        typo = self.client.post("/api/search", json={"q": "sharam"})
         self.assertEqual(typo.status_code, 200, typo.text)
         self.assertEqual([item["full_name"] for item in typo.json()["results"]], ["Priya Sharma"])
 
-        combined = self.client.get(
+        combined = self.client.post(
             "/api/search",
-            params={"q": "Priya in Screening for more than a week except rejected"},
+            json={"q": "Priya in Screening for more than a week except rejected"},
         )
         self.assertEqual(combined.status_code, 200, combined.text)
         self.assertEqual([item["full_name"] for item in combined.json()["results"]], ["Priya Sharma"])
 
-        zero = self.client.get("/api/search", params={"q": "Find No Such Candidate"})
+        zero = self.client.post("/api/search", json={"q": "Find No Such Candidate"})
         self.assertEqual(zero.status_code, 200)
         self.assertEqual(zero.json()["count"], 0)
 
-        unclear = self.client.get("/api/search", params={"q": "Tell me a joke"})
+        unclear = self.client.post("/api/search", json={"q": "Tell me a joke"})
         self.assertEqual(unclear.status_code, 422)
         self.assertEqual(unclear.json()["error"]["code"], "query_not_understood")
         self.assertTrue(unclear.json()["error"]["examples"])
@@ -209,7 +271,7 @@ class CandidateApiTestCase(unittest.TestCase):
                 json={"email": "recruiter@example.test", "password": "correct-horse-battery"},
             )
             self.assertEqual(login.status_code, 200)
-            response = client.get("/api/search", params={"q": "Who is newly available?"})
+            response = client.post("/api/search", json={"q": "Who is newly available?"})
             self.assertEqual(response.status_code, 200, response.text)
             self.assertEqual(response.json()["interpretation_source"], "ai")
             self.assertEqual(
@@ -236,7 +298,7 @@ class CandidateApiTestCase(unittest.TestCase):
             )
             self.assertEqual(login.status_code, 200)
             with patch("hiring_pipeline.search.urlopen") as provider:
-                response = client.get("/api/search", params={"q": "Who is newly available?"})
+                response = client.post("/api/search", json={"q": "Who is newly available?"})
             self.assertEqual(response.status_code, 422)
             self.assertEqual(response.json()["error"]["code"], "query_not_understood")
             provider.assert_not_called()

@@ -134,39 +134,58 @@ def parse_deterministic_query(
     filters = SearchFilters()
 
     exclude_match = re.search(
-        r"\b(?:except|excluding|exclude|not\s+including)\s+(?:the\s+)?rejected\b",
+        r"\b(?:except|excluding|exclude|not\s+including|not\s+in)\s+(?:the\s+)?rejected\b",
         normalized,
     )
     if exclude_match:
         filters.excluded_stages.add(Stage.REJECTED.value)
 
-    moved_match = re.search(
+    moved_matches = list(re.finditer(
         r"\bmoved\s+(?:to|into)\s+(" + STAGE_PATTERN + r")\b", normalized
-    )
+    ))
+    if len(moved_matches) > 1 or re.search(r"\bnot\s+since\s+monday\b", normalized):
+        return None
+    moved_match = moved_matches[0] if moved_matches else None
     if moved_match:
         filters.moved_to = _canonical_stage(moved_match.group(1))
         filters.moved_since_monday = bool(re.search(r"\bsince\s+monday\b", normalized))
 
     reached_offer = re.search(
-        r"\breached\s+(?:the\s+)?offer\b.*\b(?:didn['’]?t|did\s+not|not)\s+get\s+hired\b",
+        r"\breached\s+(?:the\s+)?offer\s+(?:(?:but|and)\s+)?"
+        r"(?:didn['’]?t|did\s+not|not)\s+get\s+hired\b",
         normalized,
     )
     if reached_offer:
         filters.reached_stage = Stage.OFFER.value
         filters.not_hired = True
 
-    if filters.moved_to is None and filters.reached_stage is None:
-        current_match = re.search(
-            r"\b(?:in|at|currently\s+in|stuck\s+in|stuck\s+at)\s+(" + STAGE_PATTERN + r")\b",
-            normalized,
-        )
-        if current_match:
-            filters.current_stage = _canonical_stage(current_match.group(1))
+    current_matches = list(re.finditer(
+        r"\b(?:in|at|currently\s+in|stuck\s+in|stuck\s+at)\s+(" + STAGE_PATTERN + r")\b",
+        normalized,
+    ))
+    current_matches = [
+        match for match in current_matches
+        if not (exclude_match and exclude_match.start() <= match.start() < exclude_match.end())
+        and not re.search(r"\b(?:not|never|except|excluding)\s+$", normalized[:match.start()])
+    ]
+    current_stages = {_canonical_stage(match.group(1)) for match in current_matches}
+    if len(current_stages) > 1:
+        return None
+    if current_stages:
+        filters.current_stage = next(iter(current_stages))
 
     duration_match = re.search(
         r"\b(?:more\s+than|over|longer\s+than)\s+(\d+|a|an|one)\s+(day|days|week|weeks|month|months)\b",
         normalized,
     )
+    if duration_match and re.search(
+        r"\bnot\s+(?:more\s+than|over|longer\s+than)\b", normalized
+    ):
+        return None
+    if re.search(r"\bsince\b", normalized) and not re.search(r"\bsince\s+monday\b", normalized):
+        return None
+    if re.search(r"\bsince\s+monday\b", normalized) and not filters.moved_to:
+        return None
     if duration_match:
         amount_text, unit = duration_match.groups()
         amount = 1 if amount_text in {"a", "an", "one"} else int(amount_text)
@@ -174,7 +193,29 @@ def parse_deterministic_query(
         filters.minimum_days_in_stage = float(amount * multiplier)
 
     # Search-style prefixes make an unknown name a valid search with zero results.
-    filters.name_query, filters.name_is_explicit = _extract_name(normalized)
+    query_for_name = normalized
+    if duration_match:
+        query_for_name = (
+            normalized[:duration_match.start()] + " " + normalized[duration_match.end():]
+        )
+    filters.name_query, filters.name_is_explicit = _extract_name(query_for_name)
+    if filters.name_is_explicit and not filters.name_query and not any((
+        filters.current_stage, filters.excluded_stages,
+        filters.minimum_days_in_stage is not None, filters.moved_to,
+        filters.reached_stage,
+    )):
+        prefix = re.match(r"^(?:find|search|show|look\s+up)\s+", normalized)
+        filters.name_query = " ".join(_name_tokens(normalized[prefix.end():])) if prefix else None
+
+    recognized_spans = [match for match in (
+        exclude_match, moved_match, reached_offer, *current_matches
+    ) if match is not None]
+    for stage_match in re.finditer(r"\b(" + STAGE_PATTERN + r")\b", normalized):
+        if not any(
+            span.start() <= stage_match.start() and stage_match.end() <= span.end()
+            for span in recognized_spans
+        ):
+            return None
     recognized_filter = any((
         filters.current_stage,
         filters.excluded_stages,
@@ -446,6 +487,22 @@ def search_candidates(
             ) from exc
         if not isinstance(filters, SearchFilters):
             raise SearchProviderUnavailable("AI search returned invalid filters.")
+        try:
+            filters = validate_ai_filters({
+                "understood": True,
+                "name_query": filters.name_query or "",
+                "current_stage": filters.current_stage or "",
+                "excluded_stages": list(filters.excluded_stages),
+                "minimum_days_in_stage": filters.minimum_days_in_stage or 0,
+                "moved_to": filters.moved_to or "",
+                "moved_since_monday": filters.moved_since_monday,
+                "reached_stage": filters.reached_stage or "",
+                "not_hired": filters.not_hired,
+            })
+        except QueryNotUnderstood:
+            raise
+        except Exception as exc:
+            raise SearchProviderUnavailable("AI search returned invalid filters.") from exc
         source = "ai"
 
     monday_start = _monday_start(moment, timezone_name)

@@ -61,6 +61,20 @@ class CandidateSearchTestCase(unittest.TestCase):
                     case["expected_names"],
                 )
 
+    def test_invalid_evaluation_queries_are_rejected_instead_of_misread(self):
+        from hiring_pipeline.evaluate_search import EVALUATION_FILE
+
+        evaluation = json.loads(EVALUATION_FILE.read_text(encoding="utf-8"))
+        for query in evaluation.get("invalid_queries", []):
+            with self.subTest(query=query):
+                with self.assertRaises(QueryNotUnderstood):
+                    search_candidates(
+                        query,
+                        self.database_path,
+                        timezone_name="Asia/Kolkata",
+                        now=self.now,
+                    )
+
     def test_similar_names_rank_exact_match_ahead_of_fuzzy_match(self):
         create_candidate(
             self.actor_id,
@@ -115,6 +129,15 @@ class CandidateSearchTestCase(unittest.TestCase):
         )
         self.assertEqual(result["interpretation_source"], "ai")
         self.assertEqual([candidate["full_name"] for candidate in result["results"]], ["Nisha Kapoor"])
+
+        invalid_filters = SearchFilters(current_stage="DROP TABLE candidates")
+        with self.assertRaises(SearchProviderUnavailable):
+            search_candidates(
+                "Who is newly available?",
+                self.database_path,
+                now=self.now,
+                ai_interpreter=lambda query: invalid_filters,
+            )
 
         malformed = {
             "understood": True,

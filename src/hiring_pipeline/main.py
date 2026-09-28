@@ -1,9 +1,10 @@
 """FastAPI application and authenticated candidate API routes."""
 
 from pathlib import Path
+import logging
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,7 +37,16 @@ from .search import (
     SearchProviderUnavailable,
     search_candidates,
 )
-from .schemas import CandidateCreateRequest, LoginRequest, RejectRequest, StageRequest
+from .schemas import (
+    CandidateCreateRequest,
+    LoginRequest,
+    RejectRequest,
+    SearchRequest,
+    StageRequest,
+)
+
+
+logger = logging.getLogger(__name__)
 
 
 def create_app(
@@ -58,6 +68,15 @@ def create_app(
             secure_cookie = settings.app_env == "production"
     if timezone_name is None:
         timezone_name = settings.app_timezone if settings else "Asia/Kolkata"
+    secret_key = secret_key.strip() if isinstance(secret_key, str) else secret_key
+    if (
+        not isinstance(secret_key, str)
+        or len(secret_key) < 32
+        or secret_key.startswith("replace-with-")
+    ):
+        raise RuntimeError(
+            "Invalid application configuration: APP_SECRET_KEY must contain at least 32 characters."
+        )
     if ai_interpreter is None and settings and settings.gemini_api_key:
         ai_interpreter = GeminiQueryInterpreter(
             settings.gemini_api_key,
@@ -97,6 +116,22 @@ def create_app(
                     "code": "invalid_request",
                     "message": "Check the request fields and try again.",
                     "details": details,
+                }
+            },
+        )
+
+    @application.exception_handler(Exception)
+    async def unexpected_error_handler(request: Request, exc: Exception):
+        logger.error(
+            "Unhandled request error",
+            exc_info=(type(exc), exc, exc.__traceback__),
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": {
+                    "code": "internal_error",
+                    "message": "An unexpected error occurred. Please try again.",
                 }
             },
         )
@@ -249,14 +284,14 @@ def create_app(
             ]
         }
 
-    @application.get("/api/search", tags=["search"])
+    @application.post("/api/search", tags=["search"])
     def search(
-        q: str = Query(..., min_length=1, max_length=500),
+        body: SearchRequest,
         recruiter_id: int = Depends(current_recruiter),
     ):
         try:
             return search_candidates(
-                q,
+                body.q,
                 application.state.database_path,
                 timezone_name=application.state.timezone_name,
                 ai_interpreter=application.state.ai_interpreter,

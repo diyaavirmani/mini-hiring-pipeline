@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "query": "Find Priya Sharma",
+      "expected_names": ["Priya Sharma"]
+    },
+    {
+      "query": "sharam",
+      "expected_names": ["Priya Sharma"]
+    },
+    {
+      "query": "Who's in Interview right now?",
+      "expected_names": ["Fatima Sheikh", "Rahul Mehta"]
+    },
+    {
+      "query": "Who has been stuck in Screening for more than a week?",
+      "expected_names": ["Priya Sharma", "Karan Malhotra"]
+    },
+    {
+      "query": "Who moved to Interview since Monday?",
+      "expected_names": ["Fatima Sheikh", "Rahul Mehta"]
+    },
+    {
+      "query": "Who reached Offer but didn't get hired?",
+      "expected_names": ["Anita Desai", "Farah Qureshi", "Joseph Fernandes", "Meera Iyer"]
+    },
+    {
+      "query": "Everyone except rejected candidates.",
+      "expected_names": [
+        "Anita Desai", "Fatima Sheikh", "Joseph Fernandes", "Karan Malhotra",
+        "Meera Iyer", "Nisha Kapoor", "Priya Sharma", "Rahul Mehta", "Vikram Nair"
+      ]
+    }
+  ]
+}

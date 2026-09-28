@@ -3,6 +3,8 @@
 from dataclasses import dataclass
 import os
 from pathlib import Path
+import re
+from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
@@ -22,6 +24,8 @@ class Settings:
     app_env: str
     app_timezone: str
     database_path: Path
+    gemini_api_key: Optional[str]
+    gemini_model: str
 
 
 def get_settings() -> Settings:
@@ -58,9 +62,15 @@ def get_settings() -> Settings:
     if not database_path.is_absolute():
         database_path = PROJECT_ROOT / database_path
 
+    gemini_model = os.getenv("GEMINI_MODEL", "gemini-3.8-flash").strip()
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", gemini_model):
+        raise ConfigurationError("GEMINI_MODEL must be a model name, not a URL or path.")
+
     return Settings(
         app_secret_key=secret,
         app_env=app_env,
         app_timezone=timezone,
         database_path=database_path.resolve(),
+        gemini_api_key=os.getenv("GEMINI_API_KEY", "").strip() or None,
+        gemini_model=gemini_model,
     )

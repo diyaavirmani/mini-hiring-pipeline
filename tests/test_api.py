@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 
 from hiring_pipeline.database import apply_migrations, connect
 from hiring_pipeline.main import create_app
+from hiring_pipeline.search import SearchFilters
+from hiring_pipeline.seed import DEFAULT_FIXTURE, seed_sample_data
 
 
 class CandidateApiTestCase(unittest.TestCase):
@@ -158,6 +160,51 @@ class CandidateApiTestCase(unittest.TestCase):
         self.assertEqual(stale.json()["error"]["code"], "transition_conflict")
         current = self.client.get(f"/api/candidates/{candidate_id}").json()
         self.assertEqual(len(current["history"]), 2)
+
+    def test_search_api_distinguishes_zero_results_from_unrecognized_queries(self):
+        self.login()
+        seed_sample_data(self.database_path, fixture_path=DEFAULT_FIXTURE)
+
+        typo = self.client.get("/api/search", params={"q": "sharam"})
+        self.assertEqual(typo.status_code, 200, typo.text)
+        self.assertEqual([item["full_name"] for item in typo.json()["results"]], ["Priya Sharma"])
+
+        combined = self.client.get(
+            "/api/search",
+            params={"q": "Priya in Screening for more than a week except rejected"},
+        )
+        self.assertEqual(combined.status_code, 200, combined.text)
+        self.assertEqual([item["full_name"] for item in combined.json()["results"]], ["Priya Sharma"])
+
+        zero = self.client.get("/api/search", params={"q": "Find No Such Candidate"})
+        self.assertEqual(zero.status_code, 200)
+        self.assertEqual(zero.json()["count"], 0)
+
+        unclear = self.client.get("/api/search", params={"q": "Tell me a joke"})
+        self.assertEqual(unclear.status_code, 422)
+        self.assertEqual(unclear.json()["error"]["code"], "query_not_understood")
+        self.assertTrue(unclear.json()["error"]["examples"])
+
+    def test_search_api_can_use_filter_only_ai_fallback(self):
+        seed_sample_data(self.database_path, fixture_path=DEFAULT_FIXTURE)
+        app = create_app(
+            database_path=self.database_path,
+            secret_key="integration-test-secret-key-32-chars",
+            secure_cookie=False,
+            ai_interpreter=lambda query: SearchFilters(current_stage="Applied", source="ai"),
+        )
+        with TestClient(app) as client:
+            login = client.post(
+                "/api/auth/login",
+                json={"email": "recruiter@example.test", "password": "correct-horse-battery"},
+            )
+            self.assertEqual(login.status_code, 200)
+            response = client.get("/api/search", params={"q": "Who is newly available?"})
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()["interpretation_source"], "ai")
+            self.assertEqual(
+                [item["full_name"] for item in response.json()["results"]], ["Nisha Kapoor"]
+            )
 
 
 if __name__ == "__main__":

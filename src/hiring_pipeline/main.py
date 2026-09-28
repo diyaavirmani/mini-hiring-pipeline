@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -29,6 +29,12 @@ from .pipeline import (
     list_candidates_grouped,
     reject_candidate,
 )
+from .search import (
+    GeminiQueryInterpreter,
+    QueryNotUnderstood,
+    SearchProviderUnavailable,
+    search_candidates,
+)
 from .schemas import CandidateCreateRequest, LoginRequest, RejectRequest, StageRequest
 
 
@@ -36,7 +42,10 @@ def create_app(
     database_path: Optional[Path] = None,
     secret_key: Optional[str] = None,
     secure_cookie: Optional[bool] = None,
+    ai_interpreter=None,
+    timezone_name: Optional[str] = None,
 ) -> FastAPI:
+    settings = None
     if database_path is None or secret_key is None or secure_cookie is None:
         try:
             settings = get_settings()
@@ -46,6 +55,13 @@ def create_app(
         secret_key = secret_key or settings.app_secret_key
         if secure_cookie is None:
             secure_cookie = settings.app_env == "production"
+    if timezone_name is None:
+        timezone_name = settings.app_timezone if settings else "Asia/Kolkata"
+    if ai_interpreter is None and settings and settings.gemini_api_key:
+        ai_interpreter = GeminiQueryInterpreter(
+            settings.gemini_api_key,
+            model=settings.gemini_model,
+        )
 
     application = FastAPI(
         title="Mini Hiring Pipeline",
@@ -55,6 +71,8 @@ def create_app(
     application.state.database_path = Path(database_path)
     application.state.secret_key = secret_key
     application.state.secure_cookie = secure_cookie
+    application.state.timezone_name = timezone_name
+    application.state.ai_interpreter = ai_interpreter
 
     @application.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError):
@@ -223,6 +241,41 @@ def create_app(
                 for stage, candidates in grouped.items()
             ]
         }
+
+    @application.get("/api/search", tags=["search"])
+    def search(
+        q: str = Query(..., min_length=1, max_length=500),
+        recruiter_id: int = Depends(current_recruiter),
+    ):
+        try:
+            return search_candidates(
+                q,
+                application.state.database_path,
+                timezone_name=application.state.timezone_name,
+                ai_interpreter=application.state.ai_interpreter,
+            )
+        except QueryNotUnderstood as exc:
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": {
+                        "code": "query_not_understood",
+                        "message": str(exc),
+                        "examples": exc.examples,
+                    }
+                },
+            )
+        except SearchProviderUnavailable as exc:
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "error": {
+                        "code": "search_interpreter_unavailable",
+                        "message": str(exc),
+                        "examples": ["Find Priya Sharma", "Who's in Interview right now?"],
+                    }
+                },
+            )
 
     @application.get("/api/candidates/{candidate_id}", tags=["candidates"])
     def open_candidate(

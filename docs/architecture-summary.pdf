@@ -1,0 +1,102 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Length 5681 >>
+stream
+0.075 0.130 0.220 rg 0 668 612 124 re f
+0.480 0.820 0.910 rg BT /F2 10 Tf 44 744 Td (MINI HIRING PIPELINE) Tj ET
+1.000 1.000 1.000 rg BT /F2 25 Tf 44 711 Td (Architecture Summary) Tj ET
+0.870 0.910 0.960 rg BT /F1 9.5 Tf 44 686 Td (One recruiter. One job. Auditable stage changes and read-only search.) Tj ET
+0.270 0.430 0.590 rg BT /F2 7.5 Tf 44 646 Td (REPOSITORY) Tj ET
+0.050 0.340 0.620 rg BT /F1 9 Tf 44 630 Td (https://github.com/diyaavirmani/mini-hiring-pipeline) Tj ET
+0.075 0.130 0.220 rg BT /F2 14 Tf 44 599 Td (Request and data flow) Tj ET
+0.940 0.970 0.980 rg 44 535 122 45 re f
+0.060 0.380 0.520 rg BT /F2 7.3 Tf 52 563 Td (01  BROWSER) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 52 548 Td (Same-origin board;) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 52 538 Td (signed recruiter) Tj ET
+0.940 0.970 0.980 rg 178 535 122 45 re f
+0.060 0.380 0.520 rg BT /F2 7.3 Tf 186 563 Td (02  FASTAPI) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 186 548 Td (Auth, validated) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 186 538 Td (requests, explicit) Tj ET
+0.940 0.970 0.980 rg 312 535 122 45 re f
+0.060 0.380 0.520 rg BT /F2 7.3 Tf 320 563 Td (03  SERVICES) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 320 548 Td (Transition rules and) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 320 538 Td (deterministic search) Tj ET
+0.940 0.970 0.980 rg 446 535 122 45 re f
+0.060 0.380 0.520 rg BT /F2 7.3 Tf 454 563 Td (04  SQLITE) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 454 548 Td (Candidate profiles plus) Tj ET
+0.150 0.190 0.240 rg BT /F1 7.2 Tf 454 538 Td (immutable events) Tj ET
+0.280 0.520 0.630 rg BT /F2 13 Tf 168 551 Td (>) Tj ET
+0.280 0.520 0.630 rg BT /F2 13 Tf 302 551 Td (>) Tj ET
+0.280 0.520 0.630 rg BT /F2 13 Tf 436 551 Td (>) Tj ET
+0.075 0.130 0.220 rg BT /F2 14 Tf 44 510 Td (Integrity and concurrency) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 492 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 492 Td (Moves run in BEGIN IMMEDIATE transactions and check the expected stage after acquiring the write lock;) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 481.4 Td (a stale concurrent request returns a conflict.) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 466.79999999999995 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 466.79999999999995 Td (Database constraints and triggers enforce the initial Applied event, one-step forward moves, rejection) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 456.19999999999993 Td (before Hired, terminal outcomes, immutable history, foreign keys, and a single recruiter.) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 441.5999999999999 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 441.5999999999999 Td (Current stage and time in stage are calculated from the newest audit event. The history records actor,) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 430.9999999999999 Td (transition, reason, and timestamp.) Tj ET
+0.075 0.130 0.220 rg BT /F2 14 Tf 44 417 Td (Search and AI boundary) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 399 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 399 Td (Known search language is parsed deterministically; supported filters combine, names are fuzzy-ranked,) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 388.4 Td (and valid zero matches are distinct from unsupported queries.) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 373.79999999999995 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 373.79999999999995 Td (If deterministic parsing cannot interpret a query, optional Gemini may propose structured filters. The) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 363.19999999999993 Td (app validates them against an allowlist and sends them through the existing read-only search service.) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 348.5999999999999 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 348.5999999999999 Td (AI cannot write SQL, edit candidates, or choose stage transitions. Search works without AI credentials) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 337.9999999999999 Td (for supported queries.) Tj ET
+0.075 0.130 0.220 rg BT /F2 14 Tf 44 315 Td (Trade-offs and scope) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 297 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 297 Td (SQLite and a same-origin UI keep local setup small for one recruiter. SQLite is not intended here for) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 286.4 Td (horizontally scaled instances or sustained multi-user write load.) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 271.79999999999995 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 271.79999999999995 Td (AI fallback adds latency, credentials, and provider availability risk. Candidate data in the local) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 261.19999999999993 Td (SQLite file is not encrypted at rest.) Tj ET
+0.050 0.480 0.550 rg BT /F2 10 Tf 49 246.59999999999994 Td (-) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.3 Tf 62 246.59999999999994 Td (AWS and Docker are out of scope for this iteration.) Tj ET
+0.075 0.130 0.220 rg BT /F2 14 Tf 44 204 Td (Verification) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.4 Tf 44 186 Td (See README.md for fresh-checkout setup, the full test run, the 19-query search evaluation, and browser-flow) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.4 Tf 44 174.7 Td (checks. The suite covers transition and audit integrity, concurrent moves, API access and validation,) Tj ET
+0.150 0.190 0.240 rg BT /F1 8.4 Tf 44 163.39999999999998 Td (configuration, AI failure/output validation, and repeat-safe sample seeding.) Tj ET
+0.840 0.870 0.900 RG .7 w 44 68 m 568 68 l S
+0.350 0.400 0.460 rg BT /F1 7.5 Tf 44 51 Td (Architecture snapshot for the mini hiring pipeline assignment) Tj ET
+0.350 0.400 0.460 rg BT /F1 7.5 Tf 496 51 Td (September 2026) Tj ET
+endstream
+endobj
+4 0 obj
+<< /Type /Annot /Subtype /Link /Rect [43 624 365 642] /Border [0 0 0] /A << /S /URI /URI (https://github.com/diyaavirmani/mini-hiring-pipeline) >> >>
+endobj
+5 0 obj
+<< /Type /Page /Parent 6 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R >> >> /Contents 3 0 R /Annots [4 0 R] >>
+endobj
+6 0 obj
+<< /Type /Pages /Kids [5 0 R] /Count 1 >>
+endobj
+7 0 obj
+<< /Type /Catalog /Pages 6 0 R >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000015 00000 n 
+0000000085 00000 n 
+0000000160 00000 n 
+0000005893 00000 n 
+0000006058 00000 n 
+0000006210 00000 n 
+0000006267 00000 n 
+trailer
+<< /Size 8 /Root 7 0 R >>
+startxref
+6316
+%%EOF

@@ -37,13 +37,21 @@ The fictional, readable fixture is [`data/sample_candidates.json`](data/sample_c
 
 ## Design choices
 
-- **FastAPI with SQLite:** the project is for one recruiter and one job, so a single local database keeps setup and operation straightforward. SQLite transactions, foreign keys, and triggers give this small app useful integrity guarantees without a separate database service. WAL mode and a busy timeout support serialized concurrent writes for this local workload. A server database would be a better fit if the app grew to multiple concurrent users or deployments.
+### Architecture
+
+The app is a same-origin FastAPI service with a small browser client. The browser calls authenticated JSON routes; the API validates requests and delegates candidate operations to the pipeline service. That service applies the stage rules inside a serialized SQLite write transaction. The database stores candidate profiles and an append-only stage-event timeline; the current stage and time in stage come from the newest event. Search is read-only: deterministic parsing handles known filters, fuzzy name matching ranks likely candidates, and an optional AI provider can translate an otherwise unsupported query into a validated filter object for the same search service.
+
+See the [architecture summary PDF](docs/architecture-summary.pdf) or its [Markdown source](docs/architecture-summary.md) for a compact component overview and repository link.
+
+### Decisions and trade-offs
+
+- **FastAPI with SQLite:** the project is for one recruiter and one job, so a single local database keeps setup and operation straightforward. SQLite transactions, foreign keys, and triggers give this small app useful integrity guarantees without a separate database service. WAL mode and a busy timeout support serialized concurrent writes for this local workload. The trade-off is that SQLite is a poor fit for horizontally scaled application instances or sustained multi-user write traffic; a server database would be a better fit as the product grows.
 - **Append-only stage history:** current stage is derived from the latest stage event. Database triggers enforce the initial Applied event, one-step forward moves, rejection before Hired, terminal outcomes, and history immutability. The service validates transitions and reports stale moves clearly.
 - **Versioned SQL migrations:** each numbered migration is applied once inside a write transaction and recorded in `schema_migrations`. Existing migration files should be treated as immutable; schema changes belong in a new migration.
 - **Configuration from environment:** `.env.example` documents local settings. The app validates the secret length, timezone, and SQLite URL and gives a direct configuration error. Do not commit `.env` or use example secrets outside local development.
 - **Protected recruiter actions:** a CLI creates one recruiter account with an Argon2 password hash. Login issues a signed, short-lived HTTP-only cookie; all candidate routes require that session.
 - **Search rules first:** search parses known stage, duration, transition, outcome, and exclusion phrases deterministically. Name matching uses fuzzy token scores and returns the strongest name matches first. Supported filters combine with AND. A valid query may return zero matches; an unsupported query gets an explanation and examples.
-- **Bounded AI fallback:** Gemini is only called when deterministic parsing cannot interpret the query. Its structured response is validated against the filter allowlist before the read-only search runs; it cannot generate SQL, change candidates, or move pipeline stages.
+- **Bounded AI fallback:** Gemini is only called when deterministic parsing cannot interpret the query. Its structured response is validated against the filter allowlist before the read-only search runs; it cannot generate SQL, change candidates, or move pipeline stages. This improves query flexibility but adds provider latency, availability, and credential requirements; searches supported by the deterministic parser work without AI credentials.
 
 ## Database schema
 
@@ -72,9 +80,9 @@ python -m unittest discover -s tests -v
 
 All 37 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, concurrent advance/reject races, singleton recruiter integrity, complete history, login protection, request validation, safe unexpected-error responses, production cookie settings, configuration validation, search interpretation and ranking, combined filters, unsupported versus valid-zero-result queries, AI filter validation and provider failures, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
 
-## Checks and current status
+## Test results and search evaluation
 
-The service, API integration, seed-data, configuration, and search tests pass (37 total). The search evaluation set passes 19/19 queries: seven assignment examples, six combined or valid-zero-result searches, and six invalid-query cases. Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh.
+Fresh-checkout verification followed the commands above in an isolated clone on Python 3.9.6: dependency installation, migrations, recruiter creation, and seeding all succeeded. The full suite passed (37 tests), and search evaluation passed 19/19 queries: seven assignment examples, six combined or valid-zero-result searches, and six invalid-query cases. A live HTTP smoke check confirmed the board loads, anonymous candidate access is denied, recruiter login succeeds, all 12 fixtures are listed, and the typo query `sharam` ranks Priya Sharma first. Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh.
 
 The authenticated endpoints are listed in `/docs`: auth routes, candidate create/list/detail/advance/reject, and `POST /api/search` with a JSON `q` field. Search text stays out of URL paths and query strings. Search returns `count`, ranked `results`, `interpretation_source`, and a plain-language explanation. A valid query with no matches returns `200` with an empty results list; a query the rules and configured fallback cannot interpret returns `422` with suggestions. Candidate detail includes complete audit history; list and search results include current stage duration. Expected names and unsupported-query cases are in [`data/search_evaluation.json`](data/search_evaluation.json).
 
@@ -86,6 +94,6 @@ python -m hiring_pipeline.evaluate_search
 
 The runner uses a fresh temporary database and fictional seed data, so it does not change the local app database.
 
-## Planned next steps
+## What I would improve with more time
 
 With more time, add login-attempt throttling, protected/encrypted backup handling for candidate data, and automated browser regression tests. The local SQLite file is not encrypted at rest, so host and backup permissions still matter. AWS and Docker are out of scope.

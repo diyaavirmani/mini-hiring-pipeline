@@ -94,6 +94,10 @@ python -m hiring_pipeline.evaluate_search
 
 The runner uses a fresh temporary database and fictional seed data, so it does not change the local app database.
 
+## AI chat log
+
+[`docs/ai-chat-logs.md`](docs/ai-chat-logs.md) contains genuine transcript excerpts available in this conversation. It is explicitly marked as partial; earlier implementation-session messages were not available to reproduce. The excerpt records a real user correction of an AI assumption, without presenting it as a product-design disagreement.
+
 ## What I would improve with more time
 
 With more time, add login-attempt throttling, protected/encrypted backup handling for candidate data, and automated browser regression tests. The local SQLite file is not encrypted at rest, so host and backup permissions still matter. AWS and Docker are out of scope.

@@ -117,6 +117,26 @@ class CandidateSearchTestCase(unittest.TestCase):
         with self.assertRaises(QueryNotUnderstood):
             search_candidates("Who is in Interview banana?", self.database_path, now=self.now)
 
+    def test_unsupported_and_clause_does_not_become_a_zero_result_name_search(self):
+        for query, explanation in (
+            ("Find Priya Sharma in Screening and salary over 10 lakh", "no salary field"),
+            ("Find Priya Sharma in Screening and likes pizza", "part after 'and'"),
+            ("Who moved to Interview since Tuesday?", "since Tuesday"),
+            ("Who is in Interview or Applied?", "with OR"),
+            ("Who is in Interview since Monday?", "movement event"),
+        ):
+            with self.subTest(query=query):
+                with self.assertRaises(QueryNotUnderstood) as raised:
+                    search_candidates(query, self.database_path, now=self.now)
+                self.assertIn(explanation, str(raised.exception))
+
+        result = search_candidates(
+            "Who reached Offer and did not get hired?",
+            self.database_path,
+            now=self.now,
+        )
+        self.assertEqual(result["count"], 4)
+
     def test_ai_fallback_only_accepts_validated_read_filters(self):
         def interpreted(query):
             return SearchFilters(current_stage="Applied", source="ai")

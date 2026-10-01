@@ -234,6 +234,92 @@ def parse_deterministic_query(
     return None
 
 
+def _unsupported_and_clause(query: str, known_names: List[str]) -> Optional[str]:
+    """Find an AND clause that cannot be represented by a supported filter.
+
+    An explicit name search otherwise treats leftover words as part of the name,
+    which can turn an unsupported condition into a misleading zero-result search.
+    """
+    normalized = _normalized_query(query)
+    conjunctions = list(re.finditer(r"\band\b", normalized))
+    offer_outcome = re.search(
+        r"\breached\s+(?:the\s+)?offer\s+and\s+did\s+not\s+get\s+hired\b",
+        normalized,
+    )
+    for index, conjunction in enumerate(conjunctions):
+        if offer_outcome and offer_outcome.start() <= conjunction.start() < offer_outcome.end():
+            continue
+        next_start = (
+            conjunctions[index + 1].start()
+            if index + 1 < len(conjunctions) else len(normalized)
+        )
+        clause = normalized[conjunction.end():next_start].strip(" \t.,?!")
+        parsed = parse_deterministic_query(clause, known_names) if clause else None
+        if parsed is None or not any((
+            parsed.current_stage,
+            parsed.excluded_stages,
+            parsed.minimum_days_in_stage is not None,
+            parsed.moved_to,
+            parsed.reached_stage,
+        )):
+            return clause or "an empty clause"
+    return None
+
+
+def _unrepresentable_query_message(query: str) -> Optional[str]:
+    """Reject conditions the search filter model cannot express, even with AI."""
+    normalized = _normalized_query(query)
+    if re.search(
+        r"\b(?:salary|compensation)\s+(?:over|under|above|below|at\s+least|"
+        r"more\s+than|less\s+than|between|\d)",
+        normalized,
+    ):
+        return "I can't filter by salary because candidate records have no salary field."
+    day_match = re.search(
+        r"\bsince\s+(tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+        normalized,
+    )
+    if day_match:
+        return (
+            f"I can filter movements since Monday, but not since {day_match.group(1).title()}. "
+            "Try 'moved to Interview since Monday'."
+        )
+    if re.search(r"\bor\b", normalized):
+        mentioned_stages = {
+            _canonical_stage(match.group(1))
+            for match in re.finditer(r"\b(" + STAGE_PATTERN + r")\b", normalized)
+        }
+        if len(mentioned_stages) > 1:
+            return "I can't combine alternative stages with OR. Search one stage at a time."
+    return None
+
+
+def _unrecognized_query_message(query: str, unsupported_clause: Optional[str]) -> str:
+    if unsupported_clause is not None:
+        return (
+            "I couldn't interpret the part after 'and': "
+            f"{unsupported_clause}. Try a supported stage, duration, "
+            "movement, outcome, or exclusion filter."
+        )
+    normalized = _normalized_query(query)
+    if re.search(r"\bsince\s+monday\b", normalized) and not re.search(
+        r"\bmoved\s+(?:to|into)\s+(" + STAGE_PATTERN + r")\b", normalized
+    ):
+        return (
+            "'Since Monday' needs a movement event. Try "
+            "'moved to Interview since Monday'."
+        )
+    if re.search(r"\bnot\s+in\s+(" + STAGE_PATTERN + r")\b", normalized):
+        return (
+            "The built-in search cannot interpret that stage exclusion. "
+            "Try 'everyone except rejected candidates'."
+        )
+    return (
+        "I couldn't understand that search. Try a candidate name, a current stage, "
+        "time in stage, movement since Monday, an Offer outcome, or an exclusion."
+    )
+
+
 def _canonical_stage(stage: str) -> str:
     for valid_stage in STAGES:
         if valid_stage.casefold() == stage.casefold():
@@ -463,20 +549,24 @@ def search_candidates(
     """Search current candidates and immutable histories without writing data."""
     if not query.strip():
         raise QueryNotUnderstood("Enter a search query.")
+    unrepresentable = _unrepresentable_query_message(query)
+    if unrepresentable:
+        raise QueryNotUnderstood(unrepresentable)
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None:
         raise ValueError("Search clock must be timezone-aware.")
     grouped = list_candidates_grouped(database_path)
     candidates = [candidate for members in grouped.values() for candidate in members]
     known_names = [candidate["full_name"] for candidate in candidates]
-    filters = parse_deterministic_query(query, known_names, moment, timezone_name)
+    unsupported_clause = _unsupported_and_clause(query, known_names)
+    filters = (
+        parse_deterministic_query(query, known_names, moment, timezone_name)
+        if unsupported_clause is None else None
+    )
     source = "rules"
     if filters is None:
         if ai_interpreter is None:
-            raise QueryNotUnderstood(
-                "I couldn't understand that search. Try a candidate name, a current stage, "
-                "time in stage, movement since Monday, an Offer outcome, or an exclusion."
-            )
+            raise QueryNotUnderstood(_unrecognized_query_message(query, unsupported_clause))
         try:
             filters = ai_interpreter(query)
         except QueryNotUnderstood:

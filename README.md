@@ -31,7 +31,7 @@ uvicorn hiring_pipeline.main:app --reload
 
 Create one recruiter account with the CLI prompt, then open <http://127.0.0.1:8000> and sign in. The board groups candidates by stage, shows time in stage, and provides candidate creation, advance/reject actions, complete audit history, and a single search box. The API sets a one-hour, signed, HTTP-only recruiter cookie after login. It uses `SameSite=Lax`; production mode also marks the cookie Secure. The API docs remain at <http://127.0.0.1:8000/docs>. The local database is created at `data/hiring_pipeline.sqlite3`. `.env` and local SQLite files are ignored by Git.
 
-`GEMINI_API_KEY` is optional. Without it, the deterministic search grammar handles supported queries and clearly explains unsupported ones. With a key, unsupported queries get one Gemini interpretation attempt, constrained to validated, read-only search filters. Set `GEMINI_MODEL` to override the default.
+`GEMINI_API_KEY` is optional. Without it, the deterministic search grammar handles supported queries and clearly explains unsupported ones. With a key, unsupported queries get one Gemini interpretation attempt, constrained to validated, read-only search filters. Set `GEMINI_MODEL` to override the default. Provider behavior is covered by mocked tests; the live Gemini call has not been verified with a real API key in this repository's checks.
 
 The fictional, readable fixture is [`data/sample_candidates.json`](data/sample_candidates.json). Seeding is safe to repeat: existing candidates with fixture emails and their histories are left unchanged. It creates examples for the typo target Priya Sharma; candidates currently in every stage; Priya and Karan in Screening for more than a week; Rahul and Fatima moved to Interview at the most recent Monday boundary in `APP_TIMEZONE`; four people who reached Offer without being hired, including Farah who was rejected after Offer; Vikram, who was hired; and three rejected candidates. Rejected candidates are excluded from the “everyone except rejected” group, while Hired candidates remain in it.
 
@@ -43,6 +43,13 @@ The app is a same-origin FastAPI service with a small browser client. The browse
 
 See the [architecture summary PDF](docs/architecture-summary.pdf) or its [Markdown source](docs/architecture-summary.md) for a compact component overview and repository link.
 
+To regenerate the PDF from the Markdown source, install the optional documentation dependency and run:
+
+```bash
+python -m pip install -e ".[docs]"
+python scripts/make_architecture_pdf.py
+```
+
 ### Decisions and trade-offs
 
 - **FastAPI with SQLite:** the project is for one recruiter and one job, so a single local database keeps setup and operation straightforward. SQLite transactions, foreign keys, and triggers give this small app useful integrity guarantees without a separate database service. WAL mode and a busy timeout support serialized concurrent writes for this local workload. The trade-off is that SQLite is a poor fit for horizontally scaled application instances or sustained multi-user write traffic; a server database would be a better fit as the product grows.
@@ -51,7 +58,7 @@ See the [architecture summary PDF](docs/architecture-summary.pdf) or its [Markdo
 - **Configuration from environment:** `.env.example` documents local settings. The app validates the secret length, timezone, and SQLite URL and gives a direct configuration error. Do not commit `.env` or use example secrets outside local development.
 - **Protected recruiter actions:** a CLI creates one recruiter account with an Argon2 password hash. Login issues a signed, short-lived HTTP-only cookie; all candidate routes require that session.
 - **Search rules first:** search parses known stage, duration, transition, outcome, and exclusion phrases deterministically. Name matching uses fuzzy token scores and returns the strongest name matches first. Supported filters combine with AND. A valid query may return zero matches; an unsupported query gets an explanation and examples.
-- **Bounded AI fallback:** Gemini is only called when deterministic parsing cannot interpret the query. Its structured response is validated against the filter allowlist before the read-only search runs; it cannot generate SQL, change candidates, or move pipeline stages. This improves query flexibility but adds provider latency, availability, and credential requirements; searches supported by the deterministic parser work without AI credentials.
+- **Bounded AI fallback:** Gemini is only called when deterministic parsing cannot interpret the query. Its structured response is validated against the filter allowlist before the read-only search runs; it cannot generate SQL, change candidates, or move pipeline stages. This improves query flexibility but adds provider latency, availability, and credential requirements; searches supported by the deterministic parser work without AI credentials. The raw search query, which may contain a candidate name, is sent to Gemini when fallback is enabled; candidate records and histories are not sent.
 
 ## Database schema
 
@@ -78,11 +85,11 @@ Run the full test suite with:
 python -m unittest discover -s tests -v
 ```
 
-All 37 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, concurrent advance/reject races, singleton recruiter integrity, complete history, login protection, request validation, safe unexpected-error responses, production cookie settings, configuration validation, search interpretation and ranking, combined filters, unsupported versus valid-zero-result queries, AI filter validation and provider failures, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
+All 38 tests pass. The suite covers initial stage and valid forward moves, rejection from every pre-Hired stage, terminal outcomes, database rejection of event updates/deletes/skipped stages, stale requests, concurrent advance/reject races, singleton recruiter integrity, complete history, login protection, request validation, safe unexpected-error responses, production cookie settings, configuration validation, search interpretation and ranking, combined filters, unsupported clauses versus valid-zero-result queries, AI filter validation and provider failures, sample query coverage, Monday timestamps, stage distribution, and repeat-safe seeding.
 
 ## Test results and search evaluation
 
-Fresh-checkout verification followed the commands above in an isolated clone on Python 3.9.6: dependency installation, migrations, recruiter creation, and seeding all succeeded. The full suite passed (37 tests), and search evaluation passed 19/19 queries: seven assignment examples, six combined or valid-zero-result searches, and six invalid-query cases. A live HTTP smoke check confirmed the board loads, anonymous candidate access is denied, recruiter login succeeds, all 12 fixtures are listed, and the typo query `sharam` ranks Priya Sharma first. Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh.
+A fresh clone on Python 3.12 installed dependencies, applied migrations, created a recruiter, and seeded the sample data. After the search regression fix, the full suite passed (38 tests), and search evaluation passed 19/19 queries: seven assignment examples, six combined or valid-zero-result searches, and six invalid-query cases. A live HTTP smoke check confirmed the board loads, anonymous candidate access is denied, recruiter login succeeds, all 12 fixtures are listed, and the typo query `sharam` ranks Priya Sharma first. Browser checks cover sign-in, the six stage columns, candidate creation, stage advancement, rejection and its audit reason, complete timeline display, typo search, valid zero-result and unsupported-query feedback, loading/error/retry states, and post-move result refresh.
 
 The authenticated endpoints are listed in `/docs`: auth routes, candidate create/list/detail/advance/reject, and `POST /api/search` with a JSON `q` field. Search text stays out of URL paths and query strings. Search returns `count`, ranked `results`, `interpretation_source`, and a plain-language explanation. A valid query with no matches returns `200` with an empty results list; a query the rules and configured fallback cannot interpret returns `422` with suggestions. Candidate detail includes complete audit history; list and search results include current stage duration. Expected names and unsupported-query cases are in [`data/search_evaluation.json`](data/search_evaluation.json).
 
@@ -96,7 +103,7 @@ The runner uses a fresh temporary database and fictional seed data, so it does n
 
 ## AI chat log
 
-[`docs/ai-chat-logs.md`](docs/ai-chat-logs.md) contains genuine transcript excerpts available in this conversation. It is explicitly marked as partial; earlier implementation-session messages were not available to reproduce. The excerpt records a real user correction of an AI assumption, without presenting it as a product-design disagreement.
+[`docs/ai-chat-logs.md`](docs/ai-chat-logs.md) contains genuine transcript excerpts available in this conversation. It is explicitly marked as partial; earlier implementation-session messages were not available to reproduce. It shows where the user disagreed with the AI's prompt plan because the implementation agent had not been given the complete assignment. Unavailable assistant messages are not reconstructed.
 
 ## What I would improve with more time
 

@@ -103,7 +103,7 @@ The runner uses a fresh temporary database and fictional seed data, so it does n
 
 ## AI chat log
 
-[`docs/ai-chat-logs.md`](docs/ai-chat-logs.md) contains genuine transcript excerpts available in this conversation. It is explicitly marked as partial; earlier implementation-session messages were not available to reproduce. It shows where the user disagreed with the AI's prompt plan because the implementation agent had not been given the complete assignment. Unavailable assistant messages are not reconstructed.
+[`docs/ai-chat-logs.md`](docs/ai-chat-logs.md) contains the user-visible prompts and assistant text replies from the one matching saved Codex session found locally (2026-09-28 through 2026-10-01 UTC). It includes the genuine correction where the AI initially identified a different assignment and the user rejected that interpretation. No separate archived sessions were present; earlier project conversations were not found and are marked unavailable.
 
 ## What I would improve with more time
 
